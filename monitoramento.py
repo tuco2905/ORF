@@ -82,10 +82,10 @@ SITES = [
 HASH_DIR = Path("hashes")
 HASH_DIR.mkdir(exist_ok=True)
 
-# Telegram: ler de variáveis de ambiente para segurança
-USE_TELEGRAM_ALERT = os.getenv("USE_TELEGRAM_ALERT", "1") not in ("0", "false", "False")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "SEU_TOKEN_DO_BOT")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "SEU_CHAT_ID")
+# Telegram: configuração direta
+USE_TELEGRAM_ALERT = True
+TELEGRAM_BOT_TOKEN = "8568563177:AAE2-LRMNzyEHGoX-SNVmul3gJ1ELiIjIsE"
+TELEGRAM_CHAT_ID = "1464187966"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
@@ -119,34 +119,120 @@ def create_driver():
     return driver
 
 
-def normalize_html(html: str) -> str:
-    """Normaliza HTML removendo scripts/styles e compactando espaços.
-    Se BeautifulSoup não estiver disponível, faz uma limpeza simples por regex.
-    """
+def extract_image_sets(html: str) -> dict:
+    """Extrai conjuntos de imagens de carousels/banners para detectar mudanças estruturais."""
+    image_sets = {}
+    
     if _BS4_AVAILABLE:
         soup = BeautifulSoup(html, "html.parser")
+        
+        # Identificar possíveis carousels/sliders/banners
+        carousel_selectors = [
+            '[class*="carousel"]',
+            '[class*="slider"]', 
+            '[class*="banner"]',
+            '[class*="slideshow"]',
+            '[id*="carousel"]',
+            '[id*="slider"]',
+            '[id*="banner"]'
+        ]
+        
+        for selector in carousel_selectors:
+            carousels = soup.select(selector)
+            for i, carousel in enumerate(carousels):
+                # Extrair todas as URLs de imagem dentro do carousel
+                images = carousel.find_all('img')
+                img_urls = []
+                
+                for img in images:
+                    src = img.get('src', '')
+                    data_src = img.get('data-src', '')  # lazy loading
+                    
+                    # Usar data-src se src estiver vazio (lazy loading)
+                    url = data_src if data_src else src
+                    
+                    if url and not url.startswith('data:'):  # ignorar imagens base64
+                        # Normalizar URL (remover parâmetros de cache)
+                        url = re.sub(r'[?&](v|cache|t|timestamp)=[^&]*', '', url)
+                        img_urls.append(url)
+                
+                if img_urls:
+                    # Criar hash do conjunto (ordenado para consistência)
+                    img_urls_sorted = sorted(set(img_urls))  # remove duplicatas e ordena
+                    set_signature = '|'.join(img_urls_sorted)
+                    image_sets[f"{selector}_{i}"] = hashlib.md5(set_signature.encode()).hexdigest()
+    
+    return image_sets
+
+
+def normalize_html(html: str) -> str:
+    """Normaliza HTML removendo scripts/styles e elementos dinâmicos, mas preservando estrutura de conteúdo."""
+    if _BS4_AVAILABLE:
+        soup = BeautifulSoup(html, "html.parser")
+        
+        # Remover scripts e styles
         for tag in soup(["script", "style"]):
             tag.decompose()
-        # remover comentários
+            
+        # Remover comentários
         for comment in soup.find_all(text=lambda text: isinstance(text, type(soup.string)) and isinstance(text, str) and text.strip().startswith("<!--")):
             try:
                 comment.extract()
             except Exception:
                 pass
+        
+        # Normalizar carousels: remover classes dinâmicas mas manter estrutura
+        carousel_elements = soup.select('[class*="carousel"], [class*="slider"], [class*="banner"]')
+        for element in carousel_elements:
+            # Remover classes que indicam estado (active, current, selected)
+            if element.get('class'):
+                classes = element.get('class', [])
+                filtered_classes = [c for c in classes if not re.match(r'(active|current|selected|show|visible)', c, re.I)]
+                if filtered_classes:
+                    element['class'] = filtered_classes
+                else:
+                    del element['class']
+            
+            # Normalizar elementos filhos (imagens do carousel)
+            for img in element.find_all('img'):
+                # Remover classes dinâmicas das imagens
+                if img.get('class'):
+                    img_classes = img.get('class', [])
+                    img_filtered = [c for c in img_classes if not re.match(r'(active|current|selected|show|visible)', c, re.I)]
+                    if img_filtered:
+                        img['class'] = img_filtered
+                    else:
+                        del img['class']
+                
+                # Remover atributos de estilo dinâmico
+                if img.get('style'):
+                    del img['style']
+        
+        # Remover timestamps e contadores dinâmicos do texto
         text = soup.get_text(separator=" ", strip=True)
+        lines = text.split('\n')
+        filtered_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            # Ignorar linhas com padrões dinâmicos comuns
+            if not re.search(r'(\d{1,2}[:/]\d{1,2}[:/]\d{2,4}|\d+:\d+|visualizaç|views?:|acess|visit|online)', line, re.I):
+                filtered_lines.append(line)
+        
+        text = '\n'.join(filtered_lines)
     else:
-        # limpeza simples e conservadora
+        # Fallback sem BeautifulSoup
         text = re.sub(r"<script[\s\S]*?</script>", "", html, flags=re.I)
         text = re.sub(r"<style[\s\S]*?</style>", "", text, flags=re.I)
-        # remover tags
         text = re.sub(r"<[^>]+>", " ", text)
-    # normalizar espaços
+    
+    # Normalizar espaços
     normalized = " ".join(text.split())
     return normalized
 
 
 def get_page_hash(driver, url: str, wait_seconds: int = 15) -> str:
-    """Carrega a URL, espera o body e retorna sha256 do HTML normalizado."""
+    """Carrega a URL, espera o body e retorna sha256 do HTML normalizado + conjuntos de imagens."""
     driver.get(url)
     try:
         WebDriverWait(driver, wait_seconds).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -157,8 +243,21 @@ def get_page_hash(driver, url: str, wait_seconds: int = 15) -> str:
     # pequena pausa para que JS assíncrono finalize (se necessário)
     time.sleep(1)
     html = driver.page_source
-    normalized = normalize_html(html)
-    page_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    
+    # Normalizar conteúdo textual
+    normalized_text = normalize_html(html)
+    
+    # Extrair conjuntos de imagens de carousels/banners
+    image_sets = extract_image_sets(html)
+    
+    # Combinar conteúdo textual + estrutura de imagens
+    combined_content = f"TEXT:{normalized_text}|IMAGES:{sorted(image_sets.items())}"
+    page_hash = hashlib.sha256(combined_content.encode("utf-8")).hexdigest()
+    
+    # Log para debug (opcional - pode ser removido depois)
+    if image_sets:
+        logging.debug(f"Conjuntos de imagem detectados em {url}: {list(image_sets.keys())}")
+    
     return page_hash
 
 
