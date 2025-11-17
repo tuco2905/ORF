@@ -1,0 +1,3 @@
+Erro ao tentar conexão com http://ava.cmm.eb.mil.br/
+Erro ao tentar conexão com http://avadepa.cmm.eb.mil.br/
+Erro ao tentar conexão com http://avasead.cmm.eb.mil.br/

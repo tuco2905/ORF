@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import WebDriverException
 
 try:
     from webdriver_manager.chrome import ChromeDriverManager
@@ -84,8 +85,8 @@ HASH_DIR.mkdir(exist_ok=True)
 
 # Telegram: ler de variáveis de ambiente para segurança
 USE_TELEGRAM_ALERT = os.getenv("USE_TELEGRAM_ALERT", "1") not in ("0", "false", "False")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "SEU_TOKEN_DO_BOT")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "SEU_CHAT_ID")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "NAO_EXISTO")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "NAO_EXISTO")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
@@ -204,7 +205,13 @@ def send_telegram_alert(message: str):
 
 
 def main():
+    inicio = time.time()
     logging.info("Iniciando verificação de %d sites...", len(SITES))
+
+    gotChangeInAnyPage: bool = False
+    mudancas = open("mudancas.txt", "w", encoding="UTF-8")
+    err_conection = open("err_conection.txt", "w", encoding="UTF-8")
+
 
     try:
         driver = create_driver()
@@ -217,32 +224,50 @@ def main():
             logging.info("Verificando %s", url)
             try:
                 current_hash = get_page_hash(driver, url)
+            
+
+                hf = hash_file_for_url(url)
+                last_hash = load_last_hash(hf)
+
+                if last_hash is None:
+                    logging.info("Primeira execução para %s — salvando hash.", url)
+                    save_hash(hf, current_hash)
+                    continue
+
+                if current_hash != last_hash:
+                    gotChangeInAnyPage = True
+                    logging.warning("MUDANÇA DETECTADA em %s", url)
+                    mudancas.write(f"MUDANÇA DETECTADA em {url}\n")
+                    save_hash(hf, current_hash)
+                    msg = (
+                        "⚠ <b>MUDANÇA DETECTADA</b>\n"
+                        f"Site: {url}\n"
+                        "O conteúdo principal da página foi alterado."
+                    )
+                    send_telegram_alert(msg)
+                else:
+                    logging.info("Nenhuma mudança detectada em %s", url)
+
+            except WebDriverException as e:
+                logging.exception(f"Erro no WebDriver: {e}")
+                err_conection.write(f"Erro ao tentar conexão com {url}\n")
+                send_telegram_alert(f"Erro ao tentar conexão com {url}")
             except Exception as e:
                 logging.exception("Erro ao obter hash de %s: %s", url, e)
                 send_telegram_alert(f"Erro ao monitorar {url}: {e}")
                 continue
 
-            hf = hash_file_for_url(url)
-            last_hash = load_last_hash(hf)
+        if not gotChangeInAnyPage:
+            send_telegram_alert(f"Verificação de páginas realizada. Nenhuma alteração encontrada.")
+            logging.info("Verificação de páginas realizada. Nenhuma alteração encontrada.")
+        
+        fim = time.time()
+        logging.info(f"Tempo de execuação: {fim - inicio} segundos")
 
-            if last_hash is None:
-                logging.info("Primeira execução para %s — salvando hash.", url)
-                save_hash(hf, current_hash)
-                continue
-
-            if current_hash != last_hash:
-                logging.warning("MUDANÇA DETECTADA em %s", url)
-                save_hash(hf, current_hash)
-                msg = (
-                    "⚠ <b>MUDANÇA DETECTADA</b>\n"
-                    f"Site: {url}\n"
-                    "O conteúdo principal da página foi alterado."
-                )
-                send_telegram_alert(msg)
-            else:
-                logging.info("Nenhuma mudança detectada em %s", url)
     finally:
         try:
+            mudancas.close()
+            err_conection.close()
             driver.quit()
         except Exception:
             pass
