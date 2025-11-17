@@ -6,6 +6,7 @@ import requests
 import re
 from urllib.parse import urlparse
 from pathlib import Path
+from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -336,25 +337,44 @@ def main():
                 if current_hash != last_hash:
                     gotChangeInAnyPage = True
                     logging.warning("MUDANÇA DETECTADA em %s", url)
-                    mudancas.write(f"MUDANÇA DETECTADA em {url}\n")
+                    mudancas.write(f"{url}\n")
                     save_hash(hf, current_hash)
-                    msg = (
-                        "⚠ <b>MUDANÇA DETECTADA</b>\n"
-                        f"Site: {url}\n"
-                        "O conteúdo principal da página foi alterado."
-                    )
-                    send_telegram_alert(msg)
                 else:
                     logging.info("Nenhuma mudança detectada em %s", url)
 
             except WebDriverException as e:
                 logging.exception(f"Erro no WebDriver: {e}")
-                err_conection.write(f"Erro ao tentar conexão com {url}\n")
-                send_telegram_alert(f"Erro ao tentar conexão com {url}")
+                err_conection.write(f"{url}\n")
             except Exception as e:
                 logging.exception("Erro ao obter hash de %s: %s", url, e)
-                send_telegram_alert(f"Erro ao monitorar {url}: {e}")
+                err_conection.write(f"{url}\n")
                 continue
+
+        mudancas.close()
+        err_conection.close()
+
+        if gotChangeInAnyPage:
+            mudancas = open("mudancas.txt", "r", encoding="UTF-8")
+            err_conection = open("err_conection.txt", "r", encoding="UTF-8")
+            
+            msg = (
+                f"Varredura realizada em {datetime.now()}\n\n"
+                "⚠ <b>MUDANÇAS DETECTADAS</b>\n"
+            )
+
+            mudancas_sites = mudancas.read().splitlines()
+
+            for site in mudancas_sites:
+                msg += f"{site}\n"
+
+            msg += "\n⚠ <b>PROBLEMAS DE CONEXÃO</b>\n"
+
+            err_conection_sites = err_conection.read().splitlines()
+
+            for site in err_conection_sites:
+                msg += f"{site}\n"
+
+            send_telegram_alert(msg)
 
         if not gotChangeInAnyPage:
             send_telegram_alert(f"Verificação de páginas realizada. Nenhuma alteração encontrada.")
