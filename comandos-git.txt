@@ -1,0 +1,29 @@
+# Comandos para fazer push para GitHub
+# Execute estes comandos no seu PowerShell local
+
+# 1. Verificar se o Git está instalado
+git --version
+
+# 2. Configurar Git (se ainda não configurado)
+git config --global user.name "Seu Nome"
+git config --global user.email "seu.email@exemplo.com"
+
+# 3. Inicializar repositório
+git init
+git branch -M main
+
+# 4. Adicionar remote
+git remote add origin https://github.com/tuco2905/ORF.git
+
+# 5. Adicionar todos os arquivos
+git add .
+
+# 6. Fazer commit
+git commit -m "Primeira versão: monitoramento de múltiplos sites com Selenium e Telegram"
+
+# 7. Fazer push
+git push -u origin main
+
+# Nota: Na primeira vez, o Git pedirá suas credenciais do GitHub
+# Para HTTPS, use seu nome de usuário e um token de acesso pessoal
+# Para gerar token: GitHub > Settings > Developer settings > Personal access tokens
