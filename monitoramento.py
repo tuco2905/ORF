@@ -9,11 +9,11 @@ from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# opcional: webdriver-manager para facilitar o driver (requer instalação)
 try:
     from webdriver_manager.chrome import ChromeDriverManager
     _WD_MANAGER_AVAILABLE = True
@@ -67,7 +67,6 @@ SITES = [
     "http://54bis.eb.mil.br/",
     "http://61bis.eb.mil.br/",
     "http://5bec.eb.mil.br/",
-    # novos sites adicionados pelo usuário
     "http://6bec.eb.mil.br/",
     "http://7bec.eb.mil.br/",
     "http://21ciaecnst.eb.mil.br/",
@@ -111,7 +110,8 @@ def create_driver():
     options.add_argument("--disable-dev-shm-usage")
 
     if _WD_MANAGER_AVAILABLE:
-        driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
     else:
         # fallback: assume ChromeDriver está no PATH
         driver = webdriver.Chrome(options=options)
