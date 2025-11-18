@@ -1,0 +1,150 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 2rem;
+    background: #0b1d2a;
+    color: #e5eaf0;
+}
+
+.container {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.panel {
+    background: #142c3c;
+    border-radius: 12px;
+    padding: 1.5rem;
+    flex: 1;
+    min-width: 280px;
+}
+
+h1,
+h2 {
+    margin-top: 0;
+    color: #4ec9b0;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+    margin-top: 1rem;
+}
+
+li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #1f3d53;
+}
+
+button {
+    font-family: inherit;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0.45rem 1rem;
+    font-weight: 600;
+    background: #4ec9b0;
+    color: #0b1d2a;
+    transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn--primary {
+    background: #4ec9b0;
+    color: #01202f;
+}
+
+.btn--ghost {
+    background: transparent;
+    border: 1px solid #4ec9b0;
+    color: #4ec9b0;
+}
+
+.btn--ghost:hover {
+    background: rgba(78, 201, 176, 0.1);
+}
+
+.btn--danger {
+    background: #ff5c5c;
+    color: #fff2f2;
+}
+
+.btn--danger:hover {
+    background: #ff4a4a;
+}
+
+.btn--sm {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+label {
+    font-weight: 600;
+}
+
+input {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: none;
+}
+
+.hint {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #9bb4c7;
+}
+
+.status {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #4ec9b0;
+}
+
+.status.error {
+    color: #ff8a80;
+}
+
+.user-card {
+    background: #0f2535;
+    border: 1px solid #1f3d53;
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.user-card__details p {
+    margin: 0.3rem 0;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.is-hidden {
+    display: none;
+}
+

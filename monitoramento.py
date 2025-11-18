@@ -28,6 +28,23 @@ try:
 except Exception:
     _BS4_AVAILABLE = False
 
+ENV_PATH = Path(__file__).with_name(".env")
+
+
+def _load_env_file():
+    if not ENV_PATH.exists():
+        return
+    for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_env_file()
+
+
 # Lista de sites a monitorar
 SITES = [
     "https://cma.eb.mil.br/",
@@ -77,7 +94,7 @@ SITES = [
     "http://cigs.eb.mil.br/",
     "https://zoo.cigs.eb.mil.br/",
     "https://licitacoeseb.12rm.eb.mil.br/community-list",
-    "http://ftloghum.eb.mil.br",
+    "http://ftloghum.eb.mil.br"
 ]
 
 # diretório para armazenar arquivos de hash
@@ -308,7 +325,7 @@ def main():
     inicio = time.time()
     logging.info("Iniciando verificação de %d sites...", len(SITES))
 
-    gotChangeInAnyPage: bool = False
+    got_changes_in_any_page: bool = False
     mudancas = open("mudancas.txt", "w", encoding="UTF-8")
     err_conection = open("err_conection.txt", "w", encoding="UTF-8")
 
@@ -335,7 +352,7 @@ def main():
                     continue
 
                 if current_hash != last_hash:
-                    gotChangeInAnyPage = True
+                    got_changes_in_any_page = True
                     logging.warning("MUDANÇA DETECTADA em %s", url)
                     mudancas.write(f"{url}\n")
                     save_hash(hf, current_hash)
@@ -343,7 +360,7 @@ def main():
                     logging.info("Nenhuma mudança detectada em %s", url)
 
             except WebDriverException as e:
-                logging.exception(f"Erro no WebDriver: {e}")
+                logging.exception(f"Erro no WebDriver: {e.msg}")
                 err_conection.write(f"{url}\n")
             except Exception as e:
                 logging.exception("Erro ao obter hash de %s: %s", url, e)
@@ -353,12 +370,12 @@ def main():
         mudancas.close()
         err_conection.close()
 
-        if gotChangeInAnyPage:
+        if got_changes_in_any_page:
             mudancas = open("mudancas.txt", "r", encoding="UTF-8")
             err_conection = open("err_conection.txt", "r", encoding="UTF-8")
             
             msg = (
-                f"Varredura realizada em {datetime.now()}\n\n"
+                f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n\n"
                 "⚠ <b>MUDANÇAS DETECTADAS</b>\n"
             )
 
@@ -376,12 +393,18 @@ def main():
 
             send_telegram_alert(msg)
 
-        if not gotChangeInAnyPage:
-            send_telegram_alert(f"Verificação de páginas realizada. Nenhuma alteração encontrada.")
+        if not got_changes_in_any_page:
+            msg = (
+                f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n\n"
+                "Verificação de páginas realizada. Nenhuma alteração encontrada."
+            )
+
+            send_telegram_alert(msg)
             logging.info("Verificação de páginas realizada. Nenhuma alteração encontrada.")
         
         fim = time.time()
-        logging.info(f"Tempo de execuação: {fim - inicio} segundos")
+        minutos, segundos = divmod((fim - inicio), 60)
+        logging.info(f"Tempo de execuação: {int(minutos)} minutos e {int(segundos)} segundos")
 
     finally:
         try:
