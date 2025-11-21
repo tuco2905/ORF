@@ -4,6 +4,7 @@ import hashlib
 import logging
 import requests
 import re
+import json
 from urllib.parse import urlparse
 from pathlib import Path
 from datetime import datetime
@@ -45,57 +46,38 @@ def _load_env_file():
 _load_env_file()
 
 
-# Lista de sites a monitorar
-SITES = [
-    "https://cma.eb.mil.br/",
-    "https://4cta.eb.mil.br/",
-    "https://nee.cma.eb.mil.br/",
-    "https://cma.eb.mil.br/operacoes",
-    "http://12rm.eb.mil.br/",
-    "http://2gpte.eb.mil.br/",
-    "http://cecma.eb.mil.br/",
-    "http://1bcomgesl.eb.mil.br/",
-    "https://5gaaaesl.eb.mil.br/",
-    "http://12cgcfex.eb.mil.br/",
-    "http://cmm.eb.mil.br/",
-    "https://cmm.eb.mil.br/ead",
-    "http://ava.cmm.eb.mil.br/",
-    "http://avadepa.cmm.eb.mil.br/",
-    "http://avasead.cmm.eb.mil.br/",
-    "http://12bsup.eb.mil.br/",
-    "http://4cgeo.eb.mil.br/",
-    "http://4bavex.eb.mil.br/",
-    "http://10gacsl.eb.mil.br/",
-    "http://cro12.eb.mil.br/",
-    "http://1bdainfsl.eb.mil.br/",
-    "http://2bdainfsl.eb.mil.br/",
-    "http://16bdainfsl.eb.mil.br/",
-    "http://17bdainfsl.eb.mil.br/",
-    "http://hmam.eb.mil.br/",
-    "http://sau.hmam.eb.mil.br/",
-    "https://agendasame.hmam.eb.mil.br/",
-    "http://hgupv.eb.mil.br/",
-    "http://hgusgc.eb.mil.br/",
-    "http://hgut.eb.mil.br/",
-    "http://1bis.eb.mil.br/",
-    "http://4bis.eb.mil.br/",
-    "http://5bis.eb.mil.br/",
-    "http://6bis.eb.mil.br/",
-    "http://7bis.eb.mil.br",
-    "http://8bis.eb.mil.br/",
-    "http://54bis.eb.mil.br/",
-    "http://61bis.eb.mil.br/",
-    "http://5bec.eb.mil.br/",
-    "http://6bec.eb.mil.br/",
-    "http://7bec.eb.mil.br/",
-    "http://21ciaecnst.eb.mil.br/",
-    "http://1blogsl.eb.mil.br/",
-    "http://17blogsl.eb.mil.br/",
-    "http://cigs.eb.mil.br/",
-    "https://zoo.cigs.eb.mil.br/",
-    "https://licitacoeseb.12rm.eb.mil.br/community-list",
-    "http://ftloghum.eb.mil.br"
-]
+SITES_JSON_PATH = Path(__file__).with_name("lista_sites.json")
+
+
+def save_sites_to_json(sites: list[str]) -> None:
+    """Persiste a lista de sites no arquivo JSON."""
+    try:
+        normalized = [str(url).strip() for url in sites if str(url).strip()]
+        SITES_JSON_PATH.write_text(
+            json.dumps(normalized, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception:
+        logging.exception("Erro ao salvar lista_sites.json")
+
+
+def load_sites_from_json() -> list[str]:
+    """Carrega a lista de sites a partir de lista_sites.json.
+
+    Considera-se que o arquivo sempre existe e contém uma lista JSON de strings.
+    """
+    raw = SITES_JSON_PATH.read_text(encoding="utf-8")
+    data = json.loads(raw)
+    if not isinstance(data, list):
+        raise ValueError("lista_sites.json deve conter uma lista.")
+
+    sites: list[str] = []
+    for item in data:
+        url = str(item).strip()
+        if url:
+            sites.append(url)
+
+    return sites
 
 # diretório para armazenar arquivos de hash
 HASH_DIR = Path("hashes")
@@ -333,7 +315,8 @@ def send_telegram_alert(message: str):
 
 def main():
     inicio = time.time()
-    logging.info("Iniciando verificação de %d sites...", len(SITES))
+    sites = load_sites_from_json()
+    logging.info("Iniciando verificação de %d sites...", len(sites))
 
     got_changes_in_any_page: bool = False
     mudancas = open("mudancas.txt", "w", encoding="UTF-8")
@@ -347,7 +330,7 @@ def main():
         return
 
     try:
-        for url in SITES:
+        for url in sites:
             logging.info("Verificando %s", url)
             try:
                 current_hash = get_page_hash(driver, url)

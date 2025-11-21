@@ -24,7 +24,7 @@ if not exist "%LOG_DIR%" (
     mkdir "%LOG_DIR%"
 )
 
-for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format ''yyyyMMdd_HHmmss''"') do set "timestamp=%%I"
+for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "timestamp=%%I"
 set "LOG_FILE=%LOG_DIR%\monitoramento_%timestamp%.log"
 
 cd /d "%BASE_DIR%"

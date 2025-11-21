@@ -7,44 +7,19 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
   </head>
   <body>
-    <h1>Console de Monitoramento</h1>
-    <div class="container">
-      <section class="panel" id="user-panel">
-        <h2>Usuário Telegram</h2>
-        <div class="user-card">
-          <div class="user-card__details">
-            <p><strong>Nome:</strong> <span id="user-name-display">{{ user.name }}</span></p>
-            <p><strong>Chat ID:</strong> <span id="user-chat-display">{{ user.chat_id }}</span></p>
-          </div>
-
-          <button type="button" class="btn btn--ghost" id="toggle-user-form">Editar usuário</button>
-
-          <form id="user-form" class="is-hidden">
-            <label for="user-name">Nome</label>
-            <input id="user-name" name="user-name" placeholder="Seu nome" value="{{ user.name }}" required />
-
-            <label for="user-chat-id">Chat ID</label>
-            <input id="user-chat-id" name="user-chat-id" placeholder="123456789" value="{{ user.chat_id }}" required />
-
-            <div class="form-actions">
-              <button type="submit" class="btn btn--primary">Salvar dados</button>
-            </div>
+    <div class="page">
+      <h1>Console de Monitoramento</h1>
+      <div class="container">
+        <section class="panel" id="sites-panel">
+          <h2>Sites monitorados: <span id="sites-count">{{ sites_count }}</span></h2>
+          <form id="add-form">
+            <label>Nova URL</label>
+            <input id="url-input" placeholder="https://exemplo.com" required />
+            <button type="submit" class="btn btn--primary">Adicionar</button>
           </form>
-
-          <small class="hint">Esses dados alimentam as variáveis APP_USER_NAME e TELEGRAM_CHAT_ID.</small>
-          <p id="user-status" class="status" aria-live="polite"></p>
-        </div>
-      </section>
-
-      <section class="panel" id="sites-panel">
-        <h2>Sites monitorados: <span id="sites-count">{{ sites_count }}</span></h2>
-        <form id="add-form">
-          <label>Nova URL</label>
-          <input id="url-input" placeholder="https://exemplo.com" required />
-          <button type="submit" class="btn btn--primary">Adicionar</button>
-        </form>
-        <ul id="sites-list"></ul>
-      </section>
+          <ul id="sites-list"></ul>
+        </section>
+      </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>

@@ -2,44 +2,11 @@
     const listEl = document.getElementById("sites-list");
     const sitesForm = document.getElementById("add-form");
     const siteInput = document.getElementById("url-input");
-    const userForm = document.getElementById("user-form");
-    const nameInput = document.getElementById("user-name");
-    const chatIdInput = document.getElementById("user-chat-id");
-    const userStatusEl = document.getElementById("user-status");
-    const userNameDisplay = document.getElementById("user-name-display");
-    const userChatDisplay = document.getElementById("user-chat-display");
-    const toggleUserFormBtn = document.getElementById("toggle-user-form");
     const sitesCountEl = document.getElementById("sites-count");
 
-    if (
-        !listEl ||
-        !sitesForm ||
-        !siteInput ||
-        !userForm ||
-        !nameInput ||
-        !chatIdInput ||
-        !userNameDisplay ||
-        !userChatDisplay ||
-        !toggleUserFormBtn
-    ) {
+    if (!listEl || !sitesForm || !siteInput) {
         return;
     }
-
-    const setUserStatus = (message = "", isError = false) => {
-        if (!userStatusEl) return;
-        userStatusEl.textContent = message;
-        userStatusEl.classList.toggle("error", Boolean(isError));
-    };
-
-    const updateToggleLabel = () => {
-        const isHidden = userForm.classList.contains("is-hidden");
-        toggleUserFormBtn.textContent = isHidden ? "Editar usuário" : "Cancelar";
-    };
-
-    const showUserForm = (shouldShow) => {
-        userForm.classList.toggle("is-hidden", !shouldShow);
-        updateToggleLabel();
-    };
 
     const handleErrorResponse = async (response) => {
         try {
@@ -71,21 +38,6 @@
     const loadSites = async () => {
         const resp = await fetch("/api/sites");
         renderSites(await resp.json());
-    };
-
-    const loadUser = async () => {
-        const resp = await fetch("/api/user");
-        if (!resp.ok) {
-            throw new Error("Não foi possível carregar o usuário.");
-        }
-        const data = await resp.json();
-        const name = data.name || "";
-        const chatId = data.chat_id || "";
-        nameInput.value = name;
-        chatIdInput.value = chatId;
-        userNameDisplay.textContent = name || "—";
-        userChatDisplay.textContent = chatId || "—";
-        return data;
     };
 
     sitesForm.addEventListener("submit", async (event) => {
@@ -128,43 +80,5 @@
         }
     });
 
-    toggleUserFormBtn.addEventListener("click", () => {
-        const shouldShow = userForm.classList.contains("is-hidden");
-        setUserStatus("");
-        showUserForm(shouldShow);
-    });
-
-    userForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const payload = {
-            name: nameInput.value.trim(),
-            chat_id: chatIdInput.value.trim(),
-        };
-
-        if (!payload.name || !payload.chat_id) {
-            setUserStatus("Preencha nome e Chat ID.", true);
-            return;
-        }
-
-        setUserStatus("Salvando...");
-        const resp = await fetch("/api/user", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        if (resp.ok) {
-            await loadUser();
-            setUserStatus("Dados atualizados com sucesso.");
-            showUserForm(false);
-        } else {
-            setUserStatus(await handleErrorResponse(resp), true);
-        }
-    });
-
     loadSites();
-    loadUser()
-        .then(() => showUserForm(false))
-        .catch((error) => setUserStatus(error.message, true));
 })();
-
