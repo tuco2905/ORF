@@ -129,8 +129,16 @@ def create_driver():
     options.add_argument("--disable-dev-shm-usage")
 
     if _WD_MANAGER_AVAILABLE:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
+        try:
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            logging.exception("Erro ao instalar o ChromeDriver")
+            logging.info("Tentando usar o ChromeDriver instalado no sistema")
+
+            CHROMEDRIVER_PATH = r"C:\Users\Administrador\.wdm\drivers\chromedriver\win64\142.0.7444.175\chromedriver-win32\chromedriver.exe"
+            service = Service(CHROMEDRIVER_PATH)
+            driver = webdriver.Chrome(service=service, options=options)
     else:
         # fallback: assume ChromeDriver está no PATH
         driver = webdriver.Chrome(options=options)
@@ -313,6 +321,8 @@ def send_telegram_alert(message: str):
     }
     try:
         resp = requests.post(url, data=payload, timeout=10)
+        logging.info("Enviando alerta para Telegram com o token: %s", TELEGRAM_BOT_TOKEN)
+        logging.info("Enviando alerta para Telegram com o chat_id: %s", TELEGRAM_CHAT_ID)
         if resp.status_code == 200:
             logging.info("Alerta enviado para Telegram.")
         else:
