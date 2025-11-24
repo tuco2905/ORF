@@ -23,7 +23,7 @@
         sites.forEach((url) => {
             const li = document.createElement("li");
             li.innerHTML = `
-                <span>${siteIndex}. ${url}</span>
+                <span>${siteIndex}. <a href="${url}" target="_blank">${url}</a></span>
                 <button type="button" class="btn btn--danger btn--sm" data-url="${url}">Remover</button>
             `;
             listEl.appendChild(li);
