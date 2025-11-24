@@ -4,10 +4,8 @@ import hashlib
 import logging
 import requests
 import re
-import json
 from urllib.parse import urlparse
 from pathlib import Path
-from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -15,7 +13,22 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import WebDriverException
+
+# Função para carregar variáveis do arquivo .env
+def load_env_file():
+    """Carrega variáveis do arquivo .env para o os.environ, se existir."""
+    env_path = Path(__file__).parent / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+
+# Carrega as variáveis de ambiente
+load_env_file()
 
 try:
     from webdriver_manager.chrome import ChromeDriverManager
@@ -29,64 +42,92 @@ try:
 except Exception:
     _BS4_AVAILABLE = False
 
-ENV_PATH = Path(__file__).with_name(".env")
+# sites a monitorar
+SITES = [
+    "https://cma.eb.mil.br/",
+    "https://4cta.eb.mil.br/",
+    "https://nee.cma.eb.mil.br/",
+    "https://cma.eb.mil.br/operacoes",
+    "http://12rm.eb.mil.br/",
+    "http://2gpte.eb.mil.br/",
+    "http://cecma.eb.mil.br/",
+    "http://1bcomgesl.eb.mil.br/",
+    "https://5gaaaesl.eb.mil.br/",
+    "http://12cgcfex.eb.mil.br/",
+    "http://cmm.eb.mil.br/",
+    "https://cmm.eb.mil.br/ead",
+    "http://ava.cmm.eb.mil.br/",
+    "http://avadepa.cmm.eb.mil.br/",
+    "http://avasead.cmm.eb.mil.br/",
+    "http://12bsup.eb.mil.br/",
+    "http://4cgeo.eb.mil.br/",
+    "http://4bavex.eb.mil.br/",
+    "http://10gacsl.eb.mil.br/",
+    "http://cro12.eb.mil.br/",
+    "http://1bdainfsl.eb.mil.br/",
+    "http://2bdainfsl.eb.mil.br/",
+    "http://16bdainfsl.eb.mil.br/",
+    "http://17bdainfsl.eb.mil.br/",
+    "http://hmam.eb.mil.br/",
+    "http://sau.hmam.eb.mil.br/",
+    "https://agendasame.hmam.eb.mil.br/",
+    "http://hgupv.eb.mil.br/",
+    "http://hgusgc.eb.mil.br/",
+    "http://hgut.eb.mil.br/",
+    "http://1bis.eb.mil.br/",
+    "http://4bis.eb.mil.br/",
+    "http://5bis.eb.mil.br/",
+    "http://6bis.eb.mil.br/",
+    "http://7bis.eb.mil.br",
+    "http://8bis.eb.mil.br/",
+    "http://54bis.eb.mil.br/",
+    "http://61bis.eb.mil.br/",
+    "http://5bec.eb.mil.br/",
+    "http://6bec.eb.mil.br/",
+    "http://7bec.eb.mil.br/",
+    "http://21ciaecnst.eb.mil.br/",
+    "http://1blogsl.eb.mil.br/",
+    "http://17blogsl.eb.mil.br/",
+    "http://cigs.eb.mil.br/",
+    "https://zoo.cigs.eb.mil.br/",
+    "https://licitacoeseb.12rm.eb.mil.br/community-list",
+    "http://ftloghum.eb.mil.br",
+]
 
+# Funções para gerenciar sites via JSON
+def load_sites_from_json():
+    """Carrega lista de sites do arquivo JSON"""
+    json_file = Path("lista_sites.json")
+    if json_file.exists():
+        try:
+            import json
+            with open(json_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            logging.warning(f"Erro ao carregar lista_sites.json: {e}")
+    
+    # Fallback para lista hardcoded
+    return SITES.copy()
 
-def _load_env_file():
-    if not ENV_PATH.exists():
-        return
-    for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip())
-
-
-_load_env_file()
-
-
-SITES_JSON_PATH = Path(__file__).with_name("lista_sites.json")
-
-
-def save_sites_to_json(sites: list[str]) -> None:
-    """Persiste a lista de sites no arquivo JSON."""
+def save_sites_to_json(sites):
+    """Salva lista de sites no arquivo JSON"""
+    json_file = Path("lista_sites.json")
     try:
-        normalized = [str(url).strip() for url in sites if str(url).strip()]
-        SITES_JSON_PATH.write_text(
-            json.dumps(normalized, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-    except Exception:
-        logging.exception("Erro ao salvar lista_sites.json")
-
-
-def load_sites_from_json() -> list[str]:
-    """Carrega a lista de sites a partir de lista_sites.json.
-
-    Considera-se que o arquivo sempre existe e contém uma lista JSON de strings.
-    """
-    raw = SITES_JSON_PATH.read_text(encoding="utf-8")
-    data = json.loads(raw)
-    if not isinstance(data, list):
-        raise ValueError("lista_sites.json deve conter uma lista.")
-
-    sites: list[str] = []
-    for item in data:
-        url = str(item).strip()
-        if url:
-            sites.append(url)
-
-    return sites
+        import json
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(sites, f, indent=2, ensure_ascii=False)
+        logging.info(f"Lista de sites salva em {json_file}")
+    except Exception as e:
+        logging.error(f"Erro ao salvar lista_sites.json: {e}")
 
 # diretório para armazenar arquivos de hash
 HASH_DIR = Path("hashes")
 HASH_DIR.mkdir(exist_ok=True)
 
-# Telegram: ler de variáveis de ambiente para segurança
+# Telegram: configuração via variáveis de ambiente
 USE_TELEGRAM_ALERT = os.getenv("USE_TELEGRAM_ALERT", "1") not in ("0", "false", "False")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "NAO_EXISTO")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "NAO_EXISTO")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "SEU_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "SEU_CHAT_ID")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
@@ -111,18 +152,9 @@ def create_driver():
     options.add_argument("--disable-dev-shm-usage")
 
     if _WD_MANAGER_AVAILABLE:
-        try:
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=options)
-        except Exception as e:
-            logging.exception("Erro ao instalar o ChromeDriver")
-            logging.info("Tentando usar o ChromeDriver instalado no sistema")
-
-            CHROMEDRIVER_PATH = r"C:\Users\Administrador\.wdm\drivers\chromedriver\win64\142.0.7444.175\chromedriver-win32\chromedriver.exe"
-            service = Service(CHROMEDRIVER_PATH)
-            driver = webdriver.Chrome(service=service, options=options)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
     else:
-        # fallback: assume ChromeDriver está no PATH
         driver = webdriver.Chrome(options=options)
 
     return driver
@@ -240,8 +272,9 @@ def normalize_html(html: str) -> str:
     return normalized
 
 
-def get_page_hash(driver, url: str, wait_seconds: int = 15) -> str:
-    """Carrega a URL, espera o body e retorna sha256 do HTML normalizado + conjuntos de imagens."""
+def get_page_hash_and_redirect_info(driver, url: str, wait_seconds: int = 15) -> tuple[str, str, bool]:
+    """Carrega a URL, espera o body e retorna sha256 do HTML normalizado + conjuntos de imagens + info de redirecionamento."""
+    original_url = url
     driver.get(url)
     try:
         WebDriverWait(driver, wait_seconds).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -251,6 +284,45 @@ def get_page_hash(driver, url: str, wait_seconds: int = 15) -> str:
 
     # pequena pausa para que JS assíncrono finalize (se necessário)
     time.sleep(1)
+    
+    # Verificar se houve redirecionamento
+    final_url = driver.current_url
+    was_redirected = False
+    redirect_info = ""
+    
+    # Normalizar URLs para comparação (remover trailing slash, fragmentos, etc.)
+    original_parsed = urlparse(original_url)
+    final_parsed = urlparse(final_url)
+    
+    # Ignorar URLs especiais (data:, file:, about:, etc.)
+    if original_parsed.scheme in ('http', 'https') and final_parsed.scheme in ('http', 'https'):
+        # Comparar domínio e path principal
+        original_domain = original_parsed.netloc.lower()
+        final_domain = final_parsed.netloc.lower()
+        
+        if original_domain != final_domain:
+            was_redirected = True
+            redirect_info = f"Redirecionado de {original_domain} para {final_domain}"
+        elif original_parsed.path.rstrip('/') != final_parsed.path.rstrip('/'):
+            # Redirecionamento para path diferente no mesmo domínio
+            # Ignorar redirecionamentos triviais (apenas adição de index.html, etc.)
+            original_path = original_parsed.path.rstrip('/').lower()
+            final_path = final_parsed.path.rstrip('/').lower()
+            
+            # Não considerar redirecionamento se:
+            # 1. Apenas adicionou index.html ou similar
+            # 2. A URL final é uma extensão da URL original (apenas adiciona caminhos)
+            # 3. URL base sendo direcionada para um subpath (adição de caminho)
+            is_trivial_redirect = (
+                (original_path == '' and final_path in ('/index.html', '/index.php', '/index.htm', '/home')) or
+                (original_path != '' and final_path.startswith(original_path + '/')) or
+                (original_path == '' and final_path != '' and final_path.startswith('/'))
+            )
+            
+            if not is_trivial_redirect:
+                was_redirected = True
+                redirect_info = f"Redirecionado para caminho diferente: {final_parsed.path}"
+    
     html = driver.page_source
     
     # Normalizar conteúdo textual
@@ -267,6 +339,12 @@ def get_page_hash(driver, url: str, wait_seconds: int = 15) -> str:
     if image_sets:
         logging.debug(f"Conjuntos de imagem detectados em {url}: {list(image_sets.keys())}")
     
+    return page_hash, redirect_info, was_redirected
+
+
+def get_page_hash(driver, url: str, wait_seconds: int = 15) -> str:
+    """Carrega a URL, espera o body e retorna sha256 do HTML normalizado + conjuntos de imagens."""
+    page_hash, _, _ = get_page_hash_and_redirect_info(driver, url, wait_seconds)
     return page_hash
 
 
@@ -303,8 +381,6 @@ def send_telegram_alert(message: str):
     }
     try:
         resp = requests.post(url, data=payload, timeout=10)
-        logging.info("Enviando alerta para Telegram com o token: %s", TELEGRAM_BOT_TOKEN)
-        logging.info("Enviando alerta para Telegram com o chat_id: %s", TELEGRAM_CHAT_ID)
         if resp.status_code == 200:
             logging.info("Alerta enviado para Telegram.")
         else:
@@ -314,14 +390,9 @@ def send_telegram_alert(message: str):
 
 
 def main():
-    inicio = time.time()
-    sites = load_sites_from_json()
-    logging.info("Iniciando verificação de %d sites...", len(sites))
-
-    got_changes_in_any_page: bool = False
-    mudancas = open("mudancas.txt", "w", encoding="UTF-8")
-    err_conection = open("err_conection.txt", "w", encoding="UTF-8")
-
+    # Carregar lista de sites do JSON (com fallback para lista hardcoded)
+    sites_to_monitor = load_sites_from_json()
+    logging.info("Iniciando verificação de %d sites...", len(sites_to_monitor))
 
     try:
         driver = create_driver()
@@ -330,79 +401,74 @@ def main():
         return
 
     try:
-        for url in sites:
+        for url in sites_to_monitor:
             logging.info("Verificando %s", url)
             try:
-                current_hash = get_page_hash(driver, url)
-            
-
-                hf = hash_file_for_url(url)
-                last_hash = load_last_hash(hf)
-
-                if last_hash is None:
-                    logging.info("Primeira execução para %s — salvando hash.", url)
-                    save_hash(hf, current_hash)
-                    continue
-
-                if current_hash != last_hash:
-                    got_changes_in_any_page = True
-                    logging.warning("MUDANÇA DETECTADA em %s", url)
-                    mudancas.write(f"{url}\n")
-                    save_hash(hf, current_hash)
-                else:
-                    logging.info("Nenhuma mudança detectada em %s", url)
-
-            except WebDriverException as e:
-                logging.exception(f"Erro no WebDriver: {e.msg}")
-                err_conection.write(f"{url}\n")
+                current_hash, redirect_info, was_redirected = get_page_hash_and_redirect_info(driver, url)
             except Exception as e:
                 logging.exception("Erro ao obter hash de %s: %s", url, e)
-                err_conection.write(f"{url}\n")
+                send_telegram_alert(f"Erro ao monitorar {url}: {e}")
                 continue
 
-        mudancas.close()
-        err_conection.close()
+            hf = hash_file_for_url(url)
+            last_hash = load_last_hash(hf)
 
-        if got_changes_in_any_page:
-            mudancas = open("mudancas.txt", "r", encoding="UTF-8")
-            err_conection = open("err_conection.txt", "r", encoding="UTF-8")
+            if last_hash is None:
+                logging.info("Primeira execução para %s — salvando hash.", url)
+                save_hash(hf, current_hash)
+                # Verificar redirecionamento na primeira execução também
+                if was_redirected:
+                    logging.warning("REDIRECIONAMENTO DETECTADO na primeira execução de %s: %s", url, redirect_info)
+                    redirect_msg = (
+                        "🔄 <b>REDIRECIONAMENTO DETECTADO</b>\n"
+                        f"Site: {url}\n"
+                        f"Info: {redirect_info}\n"
+                        "⚠️ Este site está sendo redirecionado para outro domínio."
+                    )
+                    send_telegram_alert(redirect_msg)
+                continue
+
+            # Montar mensagem base
+            msg_parts = []
             
-            msg = (
-                f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n\n"
-                "⚠ <b>MUDANÇAS DETECTADAS</b>\n"
-            )
+            if current_hash != last_hash:
+                logging.warning("MUDANÇA DETECTADA em %s", url)
+                save_hash(hf, current_hash)
+                msg_parts.append(
+                    "⚠ <b>MUDANÇA DETECTADA</b>\n"
+                    f"Site: {url}\n"
+                    "O conteúdo principal da página foi alterado."
+                )
 
-            mudancas_sites = mudancas.read().splitlines()
+            # Adicionar aviso de redirecionamento se detectado
+            if was_redirected:
+                logging.warning("REDIRECIONAMENTO DETECTADO em %s: %s", url, redirect_info)
+                redirect_warning = (
+                    f"\n\n🔄 <b>ATENÇÃO - REDIRECIONAMENTO</b>\n"
+                    f"Info: {redirect_info}\n"
+                    "⚠️ Este site está sendo redirecionado para outro domínio."
+                )
+                
+                if msg_parts:
+                    # Adicionar à mensagem de mudança existente
+                    msg_parts.append(redirect_warning)
+                else:
+                    # Criar mensagem apenas para redirecionamento
+                    msg_parts.append(
+                        f"🔄 <b>REDIRECIONAMENTO DETECTADO</b>\n"
+                        f"Site: {url}\n"
+                        f"Info: {redirect_info}\n"
+                        "⚠️ Este site está sendo redirecionado para outro domínio."
+                    )
 
-            for site in mudancas_sites:
-                msg += f"{site}\n"
-
-            msg += "\n⚠ <b>PROBLEMAS DE CONEXÃO</b>\n"
-
-            err_conection_sites = err_conection.read().splitlines()
-
-            for site in err_conection_sites:
-                msg += f"{site}\n"
-
-            send_telegram_alert(msg)
-
-        if not got_changes_in_any_page:
-            msg = (
-                f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n\n"
-                "Verificação de páginas realizada. Nenhuma alteração encontrada."
-            )
-
-            send_telegram_alert(msg)
-            logging.info("Verificação de páginas realizada. Nenhuma alteração encontrada.")
-        
-        fim = time.time()
-        minutos, segundos = divmod((fim - inicio), 60)
-        logging.info(f"Tempo de execuação: {int(minutos)} minutos e {int(segundos)} segundos")
-
+            # Enviar mensagem se houver algo para reportar
+            if msg_parts:
+                final_message = "".join(msg_parts)
+                send_telegram_alert(final_message)
+            else:
+                logging.info("Nenhuma mudança detectada em %s", url)
     finally:
         try:
-            mudancas.close()
-            err_conection.close()
             driver.quit()
         except Exception:
             pass
