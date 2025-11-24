@@ -6,6 +6,8 @@ import requests
 import re
 from urllib.parse import urlparse
 from pathlib import Path
+from typing import List
+from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -13,6 +15,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import WebDriverException
 
 # Função para carregar variáveis do arquivo .env
 def load_env_file():
@@ -42,57 +45,6 @@ try:
 except Exception:
     _BS4_AVAILABLE = False
 
-# sites a monitorar
-SITES = [
-    "https://cma.eb.mil.br/",
-    "https://4cta.eb.mil.br/",
-    "https://nee.cma.eb.mil.br/",
-    "https://cma.eb.mil.br/operacoes",
-    "http://12rm.eb.mil.br/",
-    "http://2gpte.eb.mil.br/",
-    "http://cecma.eb.mil.br/",
-    "http://1bcomgesl.eb.mil.br/",
-    "https://5gaaaesl.eb.mil.br/",
-    "http://12cgcfex.eb.mil.br/",
-    "http://cmm.eb.mil.br/",
-    "https://cmm.eb.mil.br/ead",
-    "http://ava.cmm.eb.mil.br/",
-    "http://avadepa.cmm.eb.mil.br/",
-    "http://avasead.cmm.eb.mil.br/",
-    "http://12bsup.eb.mil.br/",
-    "http://4cgeo.eb.mil.br/",
-    "http://4bavex.eb.mil.br/",
-    "http://10gacsl.eb.mil.br/",
-    "http://cro12.eb.mil.br/",
-    "http://1bdainfsl.eb.mil.br/",
-    "http://2bdainfsl.eb.mil.br/",
-    "http://16bdainfsl.eb.mil.br/",
-    "http://17bdainfsl.eb.mil.br/",
-    "http://hmam.eb.mil.br/",
-    "http://sau.hmam.eb.mil.br/",
-    "https://agendasame.hmam.eb.mil.br/",
-    "http://hgupv.eb.mil.br/",
-    "http://hgusgc.eb.mil.br/",
-    "http://hgut.eb.mil.br/",
-    "http://1bis.eb.mil.br/",
-    "http://4bis.eb.mil.br/",
-    "http://5bis.eb.mil.br/",
-    "http://6bis.eb.mil.br/",
-    "http://7bis.eb.mil.br",
-    "http://8bis.eb.mil.br/",
-    "http://54bis.eb.mil.br/",
-    "http://61bis.eb.mil.br/",
-    "http://5bec.eb.mil.br/",
-    "http://6bec.eb.mil.br/",
-    "http://7bec.eb.mil.br/",
-    "http://21ciaecnst.eb.mil.br/",
-    "http://1blogsl.eb.mil.br/",
-    "http://17blogsl.eb.mil.br/",
-    "http://cigs.eb.mil.br/",
-    "https://zoo.cigs.eb.mil.br/",
-    "https://licitacoeseb.12rm.eb.mil.br/community-list",
-    "http://ftloghum.eb.mil.br",
-]
 
 # Funções para gerenciar sites via JSON
 def load_sites_from_json():
@@ -105,9 +57,7 @@ def load_sites_from_json():
                 return json.load(f)
         except Exception as e:
             logging.warning(f"Erro ao carregar lista_sites.json: {e}")
-    
-    # Fallback para lista hardcoded
-    return SITES.copy()
+
 
 def save_sites_to_json(sites):
     """Salva lista de sites no arquivo JSON"""
@@ -390,7 +340,8 @@ def send_telegram_alert(message: str):
 
 
 def main():
-    # Carregar lista de sites do JSON (com fallback para lista hardcoded)
+    inicio = time.time()
+
     sites_to_monitor = load_sites_from_json()
     logging.info("Iniciando verificação de %d sites...", len(sites_to_monitor))
 
@@ -400,14 +351,24 @@ def main():
         logging.exception("Não foi possível criar o driver do Selenium: %s", e)
         return
 
+    mudancas: List[str] = []
+    err_connections: List[str] = []
+    redirecionamentos: List[str] = []
+    err_desconhecido: List[str] = []
+
     try:
         for url in sites_to_monitor:
             logging.info("Verificando %s", url)
             try:
                 current_hash, redirect_info, was_redirected = get_page_hash_and_redirect_info(driver, url)
+            except WebDriverException as e:
+                logging.exception(f"Erro no WebDriver: {e.msg}")
+                err_connections.append(url)
+                continue
+
             except Exception as e:
                 logging.exception("Erro ao obter hash de %s: %s", url, e)
-                send_telegram_alert(f"Erro ao monitorar {url}: {e}")
+                err_desconhecido.append(url)
                 continue
 
             hf = hash_file_for_url(url)
@@ -419,54 +380,75 @@ def main():
                 # Verificar redirecionamento na primeira execução também
                 if was_redirected:
                     logging.warning("REDIRECIONAMENTO DETECTADO na primeira execução de %s: %s", url, redirect_info)
-                    redirect_msg = (
-                        "🔄 <b>REDIRECIONAMENTO DETECTADO</b>\n"
-                        f"Site: {url}\n"
-                        f"Info: {redirect_info}\n"
-                        "⚠️ Este site está sendo redirecionado para outro domínio."
-                    )
-                    send_telegram_alert(redirect_msg)
-                continue
+                    # redirect_msg = (
+                    #     "🔄 <b>REDIRECIONAMENTO DETECTADO</b>\n"
+                    #     f"Site: {url}\n"
+                    #     f"Info: {redirect_info}\n"
+                    #     "⚠️ Este site está sendo redirecionado para outro domínio."
+                    # )
+                    # send_telegram_alert(redirect_msg)
 
-            # Montar mensagem base
-            msg_parts = []
+                    redirecionamentos.append(redirect_info)
+                continue
             
             if current_hash != last_hash:
                 logging.warning("MUDANÇA DETECTADA em %s", url)
                 save_hash(hf, current_hash)
-                msg_parts.append(
-                    "⚠ <b>MUDANÇA DETECTADA</b>\n"
-                    f"Site: {url}\n"
-                    "O conteúdo principal da página foi alterado."
-                )
+                # msg_parts.append(
+                #     "⚠ <b>MUDANÇA DETECTADA</b>\n"
+                #     f"Site: {url}\n"
+                #     "O conteúdo principal da página foi alterado."
+                # )
+
+                mudancas.append(url)
 
             # Adicionar aviso de redirecionamento se detectado
             if was_redirected:
                 logging.warning("REDIRECIONAMENTO DETECTADO em %s: %s", url, redirect_info)
-                redirect_warning = (
-                    f"\n\n🔄 <b>ATENÇÃO - REDIRECIONAMENTO</b>\n"
-                    f"Info: {redirect_info}\n"
-                    "⚠️ Este site está sendo redirecionado para outro domínio."
-                )
-                
-                if msg_parts:
-                    # Adicionar à mensagem de mudança existente
-                    msg_parts.append(redirect_warning)
-                else:
-                    # Criar mensagem apenas para redirecionamento
-                    msg_parts.append(
-                        f"🔄 <b>REDIRECIONAMENTO DETECTADO</b>\n"
-                        f"Site: {url}\n"
-                        f"Info: {redirect_info}\n"
-                        "⚠️ Este site está sendo redirecionado para outro domínio."
-                    )
 
-            # Enviar mensagem se houver algo para reportar
-            if msg_parts:
-                final_message = "".join(msg_parts)
-                send_telegram_alert(final_message)
-            else:
-                logging.info("Nenhuma mudança detectada em %s", url)
+                redirecionamentos.append(redirect_info)
+
+        # Enviar mensagem se houver algo para reportar
+
+
+        if mudancas or err_connections or redirecionamentos or err_desconhecido:
+            msg = f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n"
+            
+            if mudancas:
+                msg += "\n⚠ <b>MUDANÇAS DETECTADAS</b>\n"
+
+                for site in mudancas:
+                    msg += f"{site}\n"
+
+            if err_connections:
+                msg += "\n⚠ <b>PROBLEMAS DE CONEXÃO</b>\n"
+
+                for site in err_connections:
+                    msg += f"{site}\n"
+
+            if redirecionamentos:
+                msg += "\n🔄 <b>REDIRECIONAMENTOS DETECTADOS</b>\n"
+
+                for info in redirecionamentos:
+                    msg += f"{info}\n"
+
+            if err_desconhecido:
+                msg += "\n❌ <b>ERROS DESCONHECIDOS</b>\n"
+
+                for site in err_desconhecido:
+                    msg += f"{site}\n"
+        else:
+            msg = (
+                f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n\n"
+                "Verificação de páginas realizada. Nenhuma alteração encontrada."
+            )
+
+        send_telegram_alert(msg)
+
+        fim = time.time()
+        minutos, segundos = divmod((fim - inicio), 60)
+        logging.info(f"Tempo de execuação: {int(minutos)} minutos e {int(segundos)} segundos")
+            
     finally:
         try:
             driver.quit()
