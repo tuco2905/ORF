@@ -105,11 +105,10 @@ ele:
 - **limpa** as pastas `dist/` e `build/` antes de cada build;
 - roda o **PyInstaller** diretamente (sem depender de arquivo `.spec`);
 - gera um executável único a partir de `monitoramento.py`;
-- cria uma pasta final:
-  - no Windows: `dist/monitoramento/monitoramento.exe`
-  - no Linux: `dist/monitoramento/monitoramento` (sem `.exe`)
-- copia automaticamente para essa pasta final:
-  - o executável (`monitoramento.exe` ou `monitoramento`),
+- cria uma pasta final (por padrão `dist/monitoramento_app/`) contendo:
+  - o executável:
+    - no Windows: `monitoramento.exe`
+    - no Linux: `monitoramento` (sem `.exe`)
   - o arquivo `.env` (se existir na raiz do projeto),
   - o arquivo `lista_sites.json`.
 
@@ -117,13 +116,13 @@ No final, a estrutura fica assim:
 
 ```text
 dist/
-  monitoramento/
+  monitoramento_app/
     monitoramento(.exe)
     .env
     lista_sites.json
 ```
 
-Essa pasta `dist/monitoramento/` é o **pacote completo** que você pode copiar para outra máquina e executar diretamente.  
+Essa pasta `dist/monitoramento_app/` é o **pacote completo** que você pode copiar para outra máquina e executar diretamente.  
 Na primeira execução em cada máquina, a pasta `hashes/` será criada automaticamente pelo `monitoramento.py`, e os arquivos de hash serão gerados pela primeira vez para cada site monitorado.
 
 ### Requisitos para usar o script de build
