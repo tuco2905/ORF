@@ -415,7 +415,7 @@ def main():
 
 
         if mudancas or err_connections or redirecionamentos or err_desconhecido:
-            msg = f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n"
+            msg = f"Varredura realizada em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
             
             if mudancas:
                 msg += "\n⚠ <b>MUDANÇAS DETECTADAS</b>\n"
