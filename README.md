@@ -88,6 +88,78 @@ O script irá:
 
 ---
 
+## Geração de executável standalone (PyInstaller)
+
+O projeto inclui um script `build_monitoramento_exe.py` que automatiza a criação de um executável único do `monitoramento.py`, pronto para distribuição.
+
+### O que o script de build faz
+
+Ao rodar:
+
+```powershell
+python build_monitoramento_exe.py
+```
+
+ele:
+
+- **limpa** as pastas `dist/` e `build/` antes de cada build;
+- roda o **PyInstaller** diretamente (sem depender de arquivo `.spec`);
+- gera um executável único a partir de `monitoramento.py`;
+- cria uma pasta final:
+  - no Windows: `dist/monitoramento/monitoramento.exe`
+  - no Linux: `dist/monitoramento/monitoramento` (sem `.exe`)
+- copia automaticamente para essa pasta final:
+  - o executável (`monitoramento.exe` ou `monitoramento`),
+  - o arquivo `.env` (se existir na raiz do projeto),
+  - o arquivo `lista_sites.json`.
+
+No final, a estrutura fica assim:
+
+```text
+dist/
+  monitoramento/
+    monitoramento(.exe)
+    .env
+    lista_sites.json
+```
+
+Essa pasta `dist/monitoramento/` é o **pacote completo** que você pode copiar para outra máquina e executar diretamente.  
+Na primeira execução em cada máquina, a pasta `hashes/` será criada automaticamente pelo `monitoramento.py`, e os arquivos de hash serão gerados pela primeira vez para cada site monitorado.
+
+### Requisitos para usar o script de build
+
+- Dependências Python instaladas:
+
+```powershell
+pip install -r requirements.txt
+pip install pyinstaller
+```
+
+- Navegador compatível com o Selenium:
+  - normalmente **Google Chrome** (ou Chromium) + `webdriver-manager` (já listado em `requirements.txt`).
+
+### Como rodar o build
+
+No Windows (PowerShell):
+
+```powershell
+cd C:\caminho\para\ORF
+.\venvautomatizacao\Scripts\activate
+python build_monitoramento_exe.py
+```
+
+No Linux:
+
+```bash
+cd /caminho/para/ORF
+source venvautomatizacao/bin/activate  # se você tiver um venv copiado/criado
+python3 build_monitoramento_exe.py
+```
+
+Depois disso, basta entrar na pasta `dist/monitoramento/` e executar o binário gerado.
+
+---
+
 ## Agendamento no Linux com `crontab` (`executar_monitoramento.sh`)
 
 O arquivo `executar_monitoramento.sh` foi feito para rodar o monitoramento em produção/servidor, com log automático:
@@ -326,7 +398,7 @@ Fluxo típico em produção:
 
 ## Push para GitHub
 
-Para enviar o projeto para o repositório GitHub, execute os comandos em `comandos-git.txt` ou use:
+Para enviar o projeto para o repositório GitHub use:
 
 ```powershell
 git init

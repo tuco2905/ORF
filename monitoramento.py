@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import hashlib
 import logging
@@ -57,6 +58,8 @@ def load_sites_from_json():
                 return json.load(f)
         except Exception as e:
             logging.warning(f"Erro ao carregar lista_sites.json: {e}")
+    # Garante que sempre retornamos uma lista, evitando None
+    return []
 
 
 def save_sites_to_json(sites):
@@ -439,7 +442,7 @@ def main():
                     msg += f"{site}\n"
         else:
             msg = (
-                f"Varredura realizada em {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}\n\n"
+                f"Varredura realizada em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
                 "Verificação de páginas realizada. Nenhuma alteração encontrada."
             )
 
@@ -457,4 +460,17 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:  # noqa: BLE001 - queremos logar qualquer erro aqui
+        logging.exception("Erro inesperado na execução do monitoramento: %s", e)
+    finally:
+        # Manter o console aberto no final da execução (útil ao rodar o .exe via duplo clique)
+        try:
+            if os.name == "nt":
+                os.system("pause")
+            else:
+                input("Pressione Enter para sair...")
+        except Exception:
+            # Se até o pause falhar, apenas sair silenciosamente
+            pass

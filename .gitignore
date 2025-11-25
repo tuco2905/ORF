@@ -14,3 +14,7 @@ __pycache__/
 
 # logs
 logs/
+
+# builds and dists
+build/
+dist/
