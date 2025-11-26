@@ -358,6 +358,7 @@ def main():
     err_connections: List[str] = []
     redirecionamentos: List[str] = []
     err_desconhecido: List[str] = []
+    change_not_detected: bool = True
 
     try:
         for url in sites_to_monitor:
@@ -383,25 +384,14 @@ def main():
                 # Verificar redirecionamento na primeira execução também
                 if was_redirected:
                     logging.warning("REDIRECIONAMENTO DETECTADO na primeira execução de %s: %s", url, redirect_info)
-                    # redirect_msg = (
-                    #     "🔄 <b>REDIRECIONAMENTO DETECTADO</b>\n"
-                    #     f"Site: {url}\n"
-                    #     f"Info: {redirect_info}\n"
-                    #     "⚠️ Este site está sendo redirecionado para outro domínio."
-                    # )
-                    # send_telegram_alert(redirect_msg)
 
                     redirecionamentos.append(redirect_info)
                 continue
             
             if current_hash != last_hash:
+                change_not_detected = False
                 logging.warning("MUDANÇA DETECTADA em %s", url)
                 save_hash(hf, current_hash)
-                # msg_parts.append(
-                #     "⚠ <b>MUDANÇA DETECTADA</b>\n"
-                #     f"Site: {url}\n"
-                #     "O conteúdo principal da página foi alterado."
-                # )
 
                 mudancas.append(url)
 
@@ -410,8 +400,10 @@ def main():
                 logging.warning("REDIRECIONAMENTO DETECTADO em %s: %s", url, redirect_info)
 
                 redirecionamentos.append(redirect_info)
-
-        # Enviar mensagem se houver algo para reportar
+            
+            if change_not_detected:
+                logging.info("Nenhuma mudança detectada em %s", url)
+                change_not_detected = True
 
 
         if mudancas or err_connections or redirecionamentos or err_desconhecido:
